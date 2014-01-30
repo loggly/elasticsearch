@@ -248,7 +248,7 @@ public class TransportBulkAction extends TransportAction<BulkRequest, BulkRespon
                 @Override
                 public void onResponse(BulkShardResponse bulkShardResponse) {
                     if (bulkShardResponse.reqExecutionTimeMillis > slowestArray.get(0).v2()) {
-                        Tuple<ShardId, Long> slowestStat = new Tuple<ShardId, Long>(shardId, 0L);
+                        Tuple<ShardId, Long> slowestStat = new Tuple<ShardId, Long>(shardId, bulkShardResponse.reqExecutionTimeMillis);
                         slowestArray.add(0, slowestStat);
                     }
                     for (BulkItemResponse bulkItemResponse : bulkShardResponse.getResponses()) {
