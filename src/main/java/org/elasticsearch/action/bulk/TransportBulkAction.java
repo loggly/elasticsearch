@@ -40,10 +40,11 @@ import org.elasticsearch.cluster.metadata.MappingMetaData;
 import org.elasticsearch.cluster.metadata.MetaData;
 import org.elasticsearch.cluster.routing.GroupShardsIterator;
 import org.elasticsearch.cluster.routing.ShardIterator;
-import org.elasticsearch.common.collect.Tuple;
 import org.elasticsearch.common.inject.Inject;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.util.concurrent.AtomicArray;
+import org.elasticsearch.common.xcontent.XContentBuilder;
+import org.elasticsearch.common.xcontent.XContentFactory;
 import org.elasticsearch.index.shard.ShardId;
 import org.elasticsearch.indices.IndexAlreadyExistsException;
 import org.elasticsearch.threadpool.ThreadPool;
@@ -52,6 +53,7 @@ import org.elasticsearch.transport.TransportChannel;
 import org.elasticsearch.transport.TransportService;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -69,6 +71,17 @@ public class TransportBulkAction extends TransportAction<BulkRequest, BulkRespon
     private final TransportShardBulkAction shardBulkAction;
 
     private final TransportCreateIndexAction createIndexAction;
+
+    class BulkStats {
+        public long latencyMillis = 0L;
+        public int numItems = 0;
+        public int failedItems = 0;
+
+        BulkStats(long latencyMillis, int numItems) {
+            this.latencyMillis = latencyMillis;
+            this.numItems = numItems;
+        }
+    }
 
     @Inject
     public TransportBulkAction(Settings settings, ThreadPool threadPool, TransportService transportService, ClusterService clusterService,
@@ -233,10 +246,8 @@ public class TransportBulkAction extends TransportAction<BulkRequest, BulkRespon
         }
 
         final AtomicInteger counter = new AtomicInteger(requestsByShard.size());
-        final Tuple<ShardId, Long> slowestStat = new Tuple<ShardId, Long>(null, 0L);
-        // place holder to modify internally
-        final List<Tuple<ShardId, Long>> slowestArray = new ArrayList<Tuple<ShardId, Long>>(1);
-        slowestArray.add(0, slowestStat);
+        final Map<ShardId,BulkStats> shardLatency = new ConcurrentHashMap<ShardId, BulkStats>();
+
         for (Map.Entry<ShardId, List<BulkItemRequest>> entry : requestsByShard.entrySet()) {
             final ShardId shardId = entry.getKey();
             final List<BulkItemRequest> requests = entry.getValue();
@@ -244,16 +255,20 @@ public class TransportBulkAction extends TransportAction<BulkRequest, BulkRespon
             bulkShardRequest.replicationType(bulkRequest.replicationType());
             bulkShardRequest.consistencyLevel(bulkRequest.consistencyLevel());
             bulkShardRequest.timeout(bulkRequest.timeout());
+            shardLatency.put(shardId, new BulkStats(System.currentTimeMillis(), requests.size()));
+
             shardBulkAction.execute(bulkShardRequest, new ActionListener<BulkShardResponse>() {
                 @Override
                 public void onResponse(BulkShardResponse bulkShardResponse) {
-                    if (bulkShardResponse.reqExecutionTimeMillis > slowestArray.get(0).v2()) {
-                        Tuple<ShardId, Long> slowestStat = new Tuple<ShardId, Long>(shardId, bulkShardResponse.reqExecutionTimeMillis);
-                        slowestArray.add(0, slowestStat);
-                    }
+                    final BulkStats bk = shardLatency.get(shardId);
+                    bk.latencyMillis = System.currentTimeMillis() - bk.latencyMillis;
                     for (BulkItemResponse bulkItemResponse : bulkShardResponse.getResponses()) {
                         responses.set(bulkItemResponse.getItemId(), bulkItemResponse);
+                        if (bulkItemResponse.isFailed()) {
+                            ++bk.failedItems;
+                        }
                     }
+
                     if (counter.decrementAndGet() == 0) {
                         finishHim();
                     }
@@ -284,9 +299,29 @@ public class TransportBulkAction extends TransportAction<BulkRequest, BulkRespon
                 }
 
                 private void finishHim() {
-                    Tuple<ShardId, Long> slowestStat = slowestArray.get(0);
-                    logger.info("Slowest shard for request is: " + slowestStat.toString());
-                    listener.onResponse(new BulkResponse(responses.toArray(new BulkItemResponse[responses.length()]), System.currentTimeMillis() - startTime));
+                    long bulkTimeMillis = System.currentTimeMillis() - startTime;
+                    try {
+                        XContentBuilder builder = XContentFactory.jsonBuilder().startObject();
+                        builder.field("bulkReqTimeMillis", bulkTimeMillis);
+                        builder.field("bulkItems", bulkRequest.requests.size());
+                        builder.startArray("shardLatency");
+                        for (Map.Entry<ShardId,BulkStats> e: shardLatency.entrySet()) {
+                            builder.startObject();
+                            builder.field("shardId", e.getKey().getId());
+                            builder.field("index", e.getKey().getIndex());
+                            builder.field("latencyMillis", e.getValue().latencyMillis);
+                            builder.field("items", e.getValue().numItems);
+                            builder.field("failedItems", e.getValue().failedItems);
+                            builder.endObject();
+                        }
+                        builder.endArray();
+                        builder.endObject();
+                        logger.info(builder.string());
+                    } catch (Exception e) {
+                        logger.error("Error generating json shard stats", e);
+                    }
+                    //logger.info("Slowest shard for request is: " + slowestStat.toString());
+                    listener.onResponse(new BulkResponse(responses.toArray(new BulkItemResponse[responses.length()]), bulkTimeMillis));
                 }
             });
         }

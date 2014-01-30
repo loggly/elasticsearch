@@ -33,7 +33,6 @@ public class BulkShardResponse extends ActionResponse {
 
     private ShardId shardId;
     private BulkItemResponse[] responses;
-    public long reqExecutionTimeMillis;
 
     BulkShardResponse() {
     }
