@@ -246,7 +246,7 @@ public class TransportBulkAction extends TransportAction<BulkRequest, BulkRespon
         }
 
         final AtomicInteger counter = new AtomicInteger(requestsByShard.size());
-        final Map<ShardId,BulkStats> shardLatency = new ConcurrentHashMap<ShardId, BulkStats>();
+        final Map<ShardId,BulkStats> shardStats = new ConcurrentHashMap<ShardId, BulkStats>();
 
         for (Map.Entry<ShardId, List<BulkItemRequest>> entry : requestsByShard.entrySet()) {
             final ShardId shardId = entry.getKey();
@@ -255,12 +255,12 @@ public class TransportBulkAction extends TransportAction<BulkRequest, BulkRespon
             bulkShardRequest.replicationType(bulkRequest.replicationType());
             bulkShardRequest.consistencyLevel(bulkRequest.consistencyLevel());
             bulkShardRequest.timeout(bulkRequest.timeout());
-            shardLatency.put(shardId, new BulkStats(System.currentTimeMillis(), requests.size()));
+            shardStats.put(shardId, new BulkStats(System.currentTimeMillis(), requests.size()));
 
             shardBulkAction.execute(bulkShardRequest, new ActionListener<BulkShardResponse>() {
                 @Override
                 public void onResponse(BulkShardResponse bulkShardResponse) {
-                    final BulkStats bk = shardLatency.get(shardId);
+                    final BulkStats bk = shardStats.get(shardId);
                     bk.latencyMillis = System.currentTimeMillis() - bk.latencyMillis;
                     for (BulkItemResponse bulkItemResponse : bulkShardResponse.getResponses()) {
                         responses.set(bulkItemResponse.getItemId(), bulkItemResponse);
@@ -305,7 +305,7 @@ public class TransportBulkAction extends TransportAction<BulkRequest, BulkRespon
                         builder.field("bulkReqTimeMillis", bulkTimeMillis);
                         builder.field("bulkItems", bulkRequest.requests.size());
                         builder.startArray("shardLatency");
-                        for (Map.Entry<ShardId,BulkStats> e: shardLatency.entrySet()) {
+                        for (Map.Entry<ShardId,BulkStats> e: shardStats.entrySet()) {
                             builder.startObject();
                             builder.field("shardId", e.getKey().getId());
                             builder.field("index", e.getKey().getIndex());
