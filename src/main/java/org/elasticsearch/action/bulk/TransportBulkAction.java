@@ -40,6 +40,7 @@ import org.elasticsearch.cluster.metadata.MappingMetaData;
 import org.elasticsearch.cluster.metadata.MetaData;
 import org.elasticsearch.cluster.routing.GroupShardsIterator;
 import org.elasticsearch.cluster.routing.ShardIterator;
+import org.elasticsearch.common.collect.Tuple;
 import org.elasticsearch.common.inject.Inject;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.util.concurrent.AtomicArray;
@@ -50,10 +51,7 @@ import org.elasticsearch.transport.BaseTransportRequestHandler;
 import org.elasticsearch.transport.TransportChannel;
 import org.elasticsearch.transport.TransportService;
 
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -235,6 +233,10 @@ public class TransportBulkAction extends TransportAction<BulkRequest, BulkRespon
         }
 
         final AtomicInteger counter = new AtomicInteger(requestsByShard.size());
+        final Tuple<ShardId, Long> slowestStat = new Tuple<ShardId, Long>(null, 0L);
+        // place holder to modify internally
+        final List<Tuple<ShardId, Long>> slowestArray = new ArrayList<Tuple<ShardId, Long>>(1);
+        slowestArray.add(0, slowestStat);
         for (Map.Entry<ShardId, List<BulkItemRequest>> entry : requestsByShard.entrySet()) {
             final ShardId shardId = entry.getKey();
             final List<BulkItemRequest> requests = entry.getValue();
@@ -245,6 +247,10 @@ public class TransportBulkAction extends TransportAction<BulkRequest, BulkRespon
             shardBulkAction.execute(bulkShardRequest, new ActionListener<BulkShardResponse>() {
                 @Override
                 public void onResponse(BulkShardResponse bulkShardResponse) {
+                    if (bulkShardResponse.reqExecutionTimeMillis > slowestArray.get(0).v2()) {
+                        Tuple<ShardId, Long> slowestStat = new Tuple<ShardId, Long>(shardId, 0L);
+                        slowestArray.add(0, slowestStat);
+                    }
                     for (BulkItemResponse bulkItemResponse : bulkShardResponse.getResponses()) {
                         responses.set(bulkItemResponse.getItemId(), bulkItemResponse);
                     }
@@ -278,6 +284,8 @@ public class TransportBulkAction extends TransportAction<BulkRequest, BulkRespon
                 }
 
                 private void finishHim() {
+                    Tuple<ShardId, Long> slowestStat = slowestArray.get(0);
+                    logger.info("Slowest shard for request is: " + slowestStat.toString());
                     listener.onResponse(new BulkResponse(responses.toArray(new BulkItemResponse[responses.length()]), System.currentTimeMillis() - startTime));
                 }
             });

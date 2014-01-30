@@ -148,6 +148,7 @@ public class TransportShardBulkAction extends TransportShardReplicationOperation
 
         BulkItemResponse[] responses = new BulkItemResponse[request.items().length];
         long[] preVersions = new long[request.items().length];
+        long startTime = System.currentTimeMillis();
         for (int requestIndex = 0; requestIndex < request.items().length; requestIndex++) {
             BulkItemRequest item = request.items()[requestIndex];
             if (item.request() instanceof IndexRequest) {
@@ -348,7 +349,9 @@ public class TransportShardBulkAction extends TransportShardReplicationOperation
                 // ignore
             }
         }
+        long elapsedTime = System.currentTimeMillis() - startTime;
         BulkShardResponse response = new BulkShardResponse(new ShardId(request.index(), request.shardId()), responses);
+        response.reqExecutionTimeMillis = elapsedTime;
         return new PrimaryResponse<BulkShardResponse, BulkShardRequest>(shardRequest.request, response, ops);
     }
 
