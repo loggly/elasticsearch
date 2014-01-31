@@ -52,7 +52,10 @@ import org.elasticsearch.transport.BaseTransportRequestHandler;
 import org.elasticsearch.transport.TransportChannel;
 import org.elasticsearch.transport.TransportService;
 
-import java.util.*;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -301,22 +304,21 @@ public class TransportBulkAction extends TransportAction<BulkRequest, BulkRespon
                 private void finishHim() {
                     long bulkTimeMillis = System.currentTimeMillis() - startTime;
                     try {
-                        XContentBuilder builder = XContentFactory.jsonBuilder().startObject();
-                        builder.field("bulkReqTimeMillis", bulkTimeMillis);
-                        builder.field("bulkItems", bulkRequest.requests.size());
-                        builder.startArray("shardLatency");
+                        final long bulkId = System.nanoTime();
+                        // since ES does not handle arrays well, do separate output of each shard
                         for (Map.Entry<ShardId,BulkStats> e: shardStats.entrySet()) {
-                            builder.startObject();
+                            XContentBuilder builder = XContentFactory.jsonBuilder().startObject();
+                            builder.field("bulkId", bulkId);
+                            builder.field("bulkReqTimeMillis", bulkTimeMillis);
+                            builder.field("bulkItems", bulkRequest.requests.size());
                             builder.field("shardId", e.getKey().getId());
                             builder.field("index", e.getKey().getIndex());
                             builder.field("latencyMillis", e.getValue().latencyMillis);
                             builder.field("items", e.getValue().numItems);
                             builder.field("failedItems", e.getValue().failedItems);
                             builder.endObject();
+                            logger.info(builder.string());
                         }
-                        builder.endArray();
-                        builder.endObject();
-                        logger.info(builder.string());
                     } catch (Exception e) {
                         logger.error("Error generating json shard stats", e);
                     }
