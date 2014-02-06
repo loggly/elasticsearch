@@ -19,6 +19,9 @@
 
 package org.elasticsearch.action.bulk;
 
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -38,10 +41,13 @@ import org.elasticsearch.cluster.ClusterState;
 import org.elasticsearch.cluster.block.ClusterBlockLevel;
 import org.elasticsearch.cluster.metadata.MappingMetaData;
 import org.elasticsearch.cluster.metadata.MetaData;
+import org.elasticsearch.cluster.node.DiscoveryNodes;
 import org.elasticsearch.cluster.routing.GroupShardsIterator;
 import org.elasticsearch.cluster.routing.ShardIterator;
+import org.elasticsearch.cluster.routing.ShardRouting;
 import org.elasticsearch.common.inject.Inject;
 import org.elasticsearch.common.settings.Settings;
+import org.elasticsearch.common.transport.InetSocketTransportAddress;
 import org.elasticsearch.common.util.concurrent.AtomicArray;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentFactory;
@@ -52,11 +58,13 @@ import org.elasticsearch.transport.BaseTransportRequestHandler;
 import org.elasticsearch.transport.TransportChannel;
 import org.elasticsearch.transport.TransportService;
 
+import java.net.InetSocketAddress;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -75,10 +83,20 @@ public class TransportBulkAction extends TransportAction<BulkRequest, BulkRespon
 
     private final TransportCreateIndexAction createIndexAction;
 
+    private final LoadingCache<InetSocketAddress, String> reverseIPLookupCache =
+            CacheBuilder.newBuilder().expireAfterAccess(60, TimeUnit.MINUTES).
+                    build(new CacheLoader<InetSocketAddress, String>() {
+                        @Override
+                        public String load(InetSocketAddress key) throws Exception {
+                            return key.getHostName();
+                        }
+                    });
+
     class BulkStats {
         public long latencyMillis = 0L;
         public int numItems = 0;
         public int failedItems = 0;
+        public ShardRouting shardRouting;
 
         BulkStats(long latencyMillis, int numItems) {
             this.latencyMillis = latencyMillis;
@@ -192,12 +210,15 @@ public class TransportBulkAction extends TransportAction<BulkRequest, BulkRespon
 
         // first, go over all the requests and create a ShardId -> Operations mapping
         Map<ShardId, List<BulkItemRequest>> requestsByShard = Maps.newHashMap();
+        final Map<ShardId, ShardRouting> shardRoutingInfo = Maps.newHashMap();
 
         for (int i = 0; i < bulkRequest.requests.size(); i++) {
             ActionRequest request = bulkRequest.requests.get(i);
             if (request instanceof IndexRequest) {
                 IndexRequest indexRequest = (IndexRequest) request;
-                ShardId shardId = clusterService.operationRouting().indexShards(clusterState, indexRequest.index(), indexRequest.type(), indexRequest.id(), indexRequest.routing()).shardId();
+                ShardIterator shardIt = clusterService.operationRouting().indexShards(clusterState, indexRequest.index(), indexRequest.type(), indexRequest.id(), indexRequest.routing());
+                ShardId shardId = shardIt.shardId();
+                shardRoutingInfo.put(shardId, shardIt.nextOrNull());
                 List<BulkItemRequest> list = requestsByShard.get(shardId);
                 if (list == null) {
                     list = Lists.newArrayList();
@@ -265,6 +286,7 @@ public class TransportBulkAction extends TransportAction<BulkRequest, BulkRespon
                 public void onResponse(BulkShardResponse bulkShardResponse) {
                     final BulkStats bk = shardStats.get(shardId);
                     bk.latencyMillis = System.currentTimeMillis() - bk.latencyMillis;
+                    bk.shardRouting = shardRoutingInfo.get(shardId);
                     for (BulkItemResponse bulkItemResponse : bulkShardResponse.getResponses()) {
                         responses.set(bulkItemResponse.getItemId(), bulkItemResponse);
                         if (bulkItemResponse.isFailed()) {
@@ -305,6 +327,7 @@ public class TransportBulkAction extends TransportAction<BulkRequest, BulkRespon
                     long bulkTimeMillis = System.currentTimeMillis() - startTime;
                     try {
                         final long bulkId = System.nanoTime();
+                        DiscoveryNodes dn = clusterService.state().getNodes();
                         // since ES does not handle arrays well, do separate output of each shard
                         for (Map.Entry<ShardId,BulkStats> e: shardStats.entrySet()) {
                             XContentBuilder builder = XContentFactory.jsonBuilder().startObject();
@@ -316,6 +339,13 @@ public class TransportBulkAction extends TransportAction<BulkRequest, BulkRespon
                             builder.field("latencyMillis", e.getValue().latencyMillis);
                             builder.field("items", e.getValue().numItems);
                             builder.field("failedItems", e.getValue().failedItems);
+                            if (e.getValue().shardRouting != null) {
+                                builder.field("nodeId", e.getValue().shardRouting.currentNodeId());
+                                final InetSocketTransportAddress inetAddress =
+                                        (InetSocketTransportAddress) dn.get(e.getValue().shardRouting.currentNodeId())
+                                                .address();
+                                builder.field("hostname", reverseIPLookupCache.get(inetAddress.address()));
+                            }
                             builder.endObject();
                             logger.info(builder.string());
                         }
