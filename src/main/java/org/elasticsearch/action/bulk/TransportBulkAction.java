@@ -325,11 +325,20 @@ public class TransportBulkAction extends TransportAction<BulkRequest, BulkRespon
 
                 private void finishHim() {
                     long bulkTimeMillis = System.currentTimeMillis() - startTime;
+                    final long bulkId = System.nanoTime();
+                    String slowestIndex = "";
+                    int slowestShardId = 0;
+                    long slowTimeMillis = 0L;
+
                     try {
-                        final long bulkId = System.nanoTime();
                         DiscoveryNodes dn = clusterService.state().getNodes();
                         // since ES does not handle arrays well, do separate output of each shard
                         for (Map.Entry<ShardId,BulkStats> e: shardStats.entrySet()) {
+                            if (e.getValue().latencyMillis > slowTimeMillis) {
+                                slowTimeMillis = e.getValue().latencyMillis;
+                                slowestIndex = e.getKey().getIndex();
+                                slowestShardId = e.getKey().getId();
+                            }
                             XContentBuilder builder = XContentFactory.jsonBuilder().startObject();
                             builder.field("bulkId", bulkId);
                             builder.field("bulkReqTimeMillis", bulkTimeMillis);
@@ -352,7 +361,7 @@ public class TransportBulkAction extends TransportAction<BulkRequest, BulkRespon
                     } catch (Exception e) {
                         logger.error("Error generating json shard stats", e);
                     }
-                    //logger.info("Slowest shard for request is: " + slowestStat.toString());
+                    logger.info("Slowest shard for request id " + bulkId + ",index=" + slowestIndex + ",shardId=" + slowestShardId);
                     listener.onResponse(new BulkResponse(responses.toArray(new BulkItemResponse[responses.length()]), bulkTimeMillis));
                 }
             });
