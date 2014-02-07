@@ -208,7 +208,7 @@ running the Elasticsearch test suite.
 
 h1. License
 
-Test3
+Test4
 
 <pre>
 This software is licensed under the Apache 2 license, quoted below.
