@@ -112,14 +112,6 @@ public class TransportBulkAction extends TransportAction<BulkRequest, BulkRespon
             return o.latencyMillis.compareTo(latencyMillis);
         }
     }
-    
-    class SlowShard {
-        public int shardId;
-        public int bulkId;
-        public String nodeId;
-        public String index; 
-    }
-
 
     @Inject
     public TransportBulkAction(Settings settings, ThreadPool threadPool, TransportService transportService, ClusterService clusterService,
@@ -404,9 +396,6 @@ public class TransportBulkAction extends TransportAction<BulkRequest, BulkRespon
                 private void finishHim() {
                     long bulkTimeMillis = System.currentTimeMillis() - startTime;
                     final long bulkId = System.nanoTime();
-                    String slowestIndex = "";
-                    int slowestShardId = 0;
-                    long slowTimeMillis = 0L;
                     try {
                         DiscoveryNodes dn = clusterService.state().getNodes();
                         Collection<BulkStats> statsCollection = shardStats.values();
