@@ -19,7 +19,6 @@ curl -XGET http://localhost:9200/_recovery?pretty&human
 --------------------------------------------------
 
 Response:
-coming[1.5.0, this syntax was change to fix inconsistencies with other API]
 [source,js]
 --------------------------------------------------
 {
@@ -94,7 +93,6 @@ In some cases a higher level of detail may be preferable. Setting "detailed=true
 curl -XGET http://localhost:9200/_recovery?pretty&human&detailed=true
 --------------------------------------------------
 
-coming[1.5.0, this syntax was change to fix inconsistencies with other API]
 Response:
 
 [source,js]
@@ -103,7 +101,7 @@ Response:
   "index1" : {
     "shards" : [ {
       "id" : 0,
-      "type" : "GATEWAY",
+      "type" : "STORE",
       "stage" : "DONE",
       "primary" : true,
       "start_time" : "2014-02-24T12:38:06.349",
@@ -191,7 +189,7 @@ Description of output fields:
 [horizontal]
 `id`::              Shard ID
 `type`::            Recovery type:
-                        * gateway
+                        * store
                         * snapshot
                         * replica
                         * relocating
