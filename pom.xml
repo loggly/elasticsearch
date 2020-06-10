@@ -4,7 +4,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <name>elasticsearch</name>
     <modelVersion>4.0.0</modelVersion>
-    <groupId>org.elasticsearch</groupId>
+    <groupId>com.loggly.elasticsearch</groupId>
     <artifactId>elasticsearch</artifactId>
     <version>1.4.2</version>
     <packaging>jar</packaging>
@@ -62,7 +62,7 @@
         <dependency>
             <groupId>com.carrotsearch.randomizedtesting</groupId>
             <artifactId>randomizedtesting-runner</artifactId>
-            <version>2.1.10</version>
+            <version>2.7.7</version>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -74,7 +74,7 @@
         <dependency>
             <groupId>org.apache.httpcomponents</groupId>
             <artifactId>httpclient</artifactId>
-            <version>4.3.5</version>
+            <version>4.5.12</version>
             <scope>test</scope>
         </dependency>
 
@@ -155,7 +155,7 @@
         <dependency>
             <groupId>com.spatial4j</groupId>
             <artifactId>spatial4j</artifactId>
-            <version>0.4.1</version>
+            <version>0.5</version>
             <scope>compile</scope>
             <optional>true</optional>
         </dependency>
@@ -176,7 +176,7 @@
         <dependency>
             <groupId>com.github.spullara.mustache.java</groupId>
             <artifactId>compiler</artifactId>
-            <version>0.8.13</version>
+            <version>0.9.6</version>
             <optional>true</optional>
         </dependency>
         <!-- Lucene spatial -->
@@ -186,14 +186,14 @@
         <dependency>
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
-            <version>18.0</version>
+            <version>29.0-jre</version>
             <scope>compile</scope>
         </dependency>
 
         <dependency>
             <groupId>com.carrotsearch</groupId>
             <artifactId>hppc</artifactId>
-            <version>0.6.0</version>
+            <version>0.8.2</version>
         </dependency>
 
         <dependency>
@@ -201,41 +201,41 @@
             <artifactId>joda-time</artifactId>
             <!-- joda 2.0 moved to using volatile fields for datetime -->
             <!-- When updating to a new version, make sure to update our copy of BaseDateTime -->
-            <version>2.3</version>
+            <version>2.10.6</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>org.joda</groupId>
             <artifactId>joda-convert</artifactId>
-            <version>1.2</version>
+            <version>2.2.1</version>
             <scope>compile</scope>
         </dependency>
 
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-core</artifactId>
-            <version>2.4.2</version>
+            <version>2.11.0</version>
             <scope>compile</scope>
         </dependency>
 
         <dependency>
             <groupId>com.fasterxml.jackson.dataformat</groupId>
             <artifactId>jackson-dataformat-smile</artifactId>
-            <version>2.4.2</version>
+            <version>2.11.0</version>
             <scope>compile</scope>
         </dependency>
 
         <dependency>
             <groupId>com.fasterxml.jackson.dataformat</groupId>
             <artifactId>jackson-dataformat-yaml</artifactId>
-            <version>2.4.2</version>
+            <version>2.11.0</version>
             <scope>compile</scope>
         </dependency>
 
         <dependency>
             <groupId>com.fasterxml.jackson.dataformat</groupId>
             <artifactId>jackson-dataformat-cbor</artifactId>
-            <version>2.4.2</version>
+            <version>2.11.0</version>
             <scope>compile</scope>
         </dependency>
 
@@ -249,21 +249,21 @@
         <dependency>
             <groupId>com.ning</groupId>
             <artifactId>compress-lzf</artifactId>
-            <version>1.0.2</version>
+            <version>1.0.4</version>
             <scope>compile</scope>
         </dependency>
 
         <dependency>
             <groupId>com.tdunning</groupId>
             <artifactId>t-digest</artifactId>
-            <version>3.0</version>
+            <version>3.2</version>
             <scope>compile</scope>
         </dependency>
 
         <dependency>
             <groupId>commons-cli</groupId>
             <artifactId>commons-cli</artifactId>
-            <version>1.2</version>
+            <version>1.4</version>
         </dependency>
 
         <!-- END: dependencies that are shaded -->
@@ -271,7 +271,7 @@
         <dependency>
             <groupId>org.codehaus.groovy</groupId>
             <artifactId>groovy-all</artifactId>
-            <version>2.3.2</version>
+            <version>3.0.4</version>
             <scope>compile</scope>
             <optional>true</optional>
         </dependency>
@@ -295,7 +295,7 @@
         <dependency>
             <groupId>net.java.dev.jna</groupId>
             <artifactId>jna</artifactId>
-            <version>4.1.0</version>
+            <version>5.5.0</version>
             <scope>compile</scope>
             <optional>true</optional>
         </dependency>
@@ -397,10 +397,9 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.1</version>
+                <version>3.8.0</version>
                 <configuration>
-                    <source>1.7</source>
-                    <target>1.7</target>
+                    <release>11</release>
                     <fork>true</fork>
                     <maxmem>512m</maxmem>
                     <!-- REMOVE WHEN UPGRADE:
@@ -624,7 +623,7 @@
                 <!-- we skip surefire to work with randomized testing above -->
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
-                <version>2.16</version>
+                <version>2.22.0</version>
                 <configuration>
                     <skipTests>true</skipTests>
                 </configuration>
