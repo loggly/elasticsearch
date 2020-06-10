@@ -223,7 +223,7 @@ public class InternalEngine extends AbstractIndexShardComponent implements Engin
     @Override
     public void updateIndexingBufferSize(ByteSizeValue indexingBufferSize) {
         ByteSizeValue preValue = this.indexingBufferSize;
-        try (InternalLock _ = readLock.acquire()) {
+        try ( InternalLock lock = readLock.acquire()) {
             this.indexingBufferSize = indexingBufferSize;
             IndexWriter indexWriter = this.indexWriter;
             if (indexWriter != null) {
@@ -258,7 +258,7 @@ public class InternalEngine extends AbstractIndexShardComponent implements Engin
     @Override
     public void start() throws EngineException {
         store.incRef();
-        try (InternalLock _ = writeLock.acquire()) {
+        try ( InternalLock lock = writeLock.acquire()) {
 
             if (indexWriter != null) {
                 throw new EngineAlreadyStartedException(shardId);
@@ -345,7 +345,7 @@ public class InternalEngine extends AbstractIndexShardComponent implements Engin
     }
 
     public GetResult get(Get get) throws EngineException {
-        try (InternalLock _ = readLock.acquire()) {
+        try ( InternalLock lock = readLock.acquire()) {
             if (get.realtime()) {
                 VersionValue versionValue = versionMap.getUnderLock(get.uid().bytes());
                 if (versionValue != null) {
@@ -398,7 +398,7 @@ public class InternalEngine extends AbstractIndexShardComponent implements Engin
     @Override
     public void create(Create create) throws EngineException {
         final IndexWriter writer;
-        try (InternalLock _ = readLock.acquire()) {
+        try ( InternalLock lock = readLock.acquire()) {
             writer = currentIndexWriter();
             try (Releasable r = throttle.acquireThrottle()) {
                 innerCreate(create, writer);
@@ -492,7 +492,7 @@ public class InternalEngine extends AbstractIndexShardComponent implements Engin
     @Override
     public void index(Index index) throws EngineException {
         final IndexWriter writer;
-        try (InternalLock _ = readLock.acquire()) {
+        try ( InternalLock lock = readLock.acquire()) {
             writer = currentIndexWriter();
             try (Releasable r = throttle.acquireThrottle()) {
                 innerIndex(index, writer);
@@ -588,7 +588,7 @@ public class InternalEngine extends AbstractIndexShardComponent implements Engin
 
     @Override
     public void delete(Delete delete) throws EngineException {
-        try (InternalLock _ = readLock.acquire()) {
+        try ( InternalLock lock = readLock.acquire()) {
             IndexWriter writer = this.indexWriter;
             if (writer == null) {
                 throw new EngineClosedException(shardId, failedEngine);
@@ -660,7 +660,7 @@ public class InternalEngine extends AbstractIndexShardComponent implements Engin
 
     @Override
     public void delete(DeleteByQuery delete) throws EngineException {
-        try (InternalLock _ = readLock.acquire()) {
+        try ( InternalLock lock = readLock.acquire()) {
             IndexWriter writer = this.indexWriter;
             if (writer == null) {
                 throw new EngineClosedException(shardId);
@@ -703,7 +703,7 @@ public class InternalEngine extends AbstractIndexShardComponent implements Engin
             SearcherManager manager = this.searcherManager;
             if (manager == null) {
                 ensureOpen();
-                try (InternalLock _ = this.readLock.acquire()) {
+                try ( InternalLock lock = this.readLock.acquire()) {
                     // we might start up right now and the searcherManager is not initialized
                     // we take the read lock and retry again since write lock is taken
                     // while start() is called and otherwise the ensureOpen() call will
@@ -783,7 +783,7 @@ public class InternalEngine extends AbstractIndexShardComponent implements Engin
         }
         // we obtain a read lock here, since we don't want a flush to happen while we are refreshing
         // since it flushes the index as well (though, in terms of concurrency, we are allowed to do it)
-        try (InternalLock _ = readLock.acquire()) {
+        try ( InternalLock lock = readLock.acquire()) {
             ensureOpen();
             // maybeRefresh will only allow one refresh to execute, and the rest will "pass through",
             // but, we want to make sure not to loose ant refresh calls, if one is taking time
@@ -831,7 +831,7 @@ public class InternalEngine extends AbstractIndexShardComponent implements Engin
         flushLock.lock();
         try {
             if (flush.type() == Flush.Type.NEW_WRITER) {
-                try (InternalLock _ = writeLock.acquire()) {
+                try ( InternalLock lock = writeLock.acquire()) {
                     if (onGoingRecoveries.get() > 0) {
                         throw new FlushNotAllowedEngineException(shardId, "Recovery is in progress, flush is not allowed");
                     }
@@ -876,7 +876,7 @@ public class InternalEngine extends AbstractIndexShardComponent implements Engin
                     }
                 }
             } else if (flush.type() == Flush.Type.COMMIT_TRANSLOG) {
-                try (InternalLock _ = readLock.acquire()) {
+                try ( InternalLock lock = readLock.acquire()) {
                     final IndexWriter indexWriter = currentIndexWriter();
                     if (onGoingRecoveries.get() > 0) {
                         throw new FlushNotAllowedEngineException(shardId, "Recovery is in progress, flush is not allowed");
@@ -913,7 +913,7 @@ public class InternalEngine extends AbstractIndexShardComponent implements Engin
                 // note, its ok to just commit without cleaning the translog, its perfectly fine to replay a
                 // translog on an index that was opened on a committed point in time that is "in the future"
                 // of that translog
-                try (InternalLock _ = readLock.acquire()) {
+                try ( InternalLock lock = readLock.acquire()) {
                     final IndexWriter indexWriter = currentIndexWriter();
                     // we allow to *just* commit if there is an ongoing recovery happening...
                     // its ok to use this, only a flush will cause a new translogId, and we are locked here from
@@ -938,7 +938,7 @@ public class InternalEngine extends AbstractIndexShardComponent implements Engin
             }
 
             // reread the last committed segment infos
-            try (InternalLock _ = readLock.acquire()) {
+            try ( InternalLock lock = readLock.acquire()) {
                 ensureOpen();
                 readLastCommittedSegmentsInfo();
             } catch (Throwable e) {
@@ -1006,7 +1006,7 @@ public class InternalEngine extends AbstractIndexShardComponent implements Engin
             return;
         }
         possibleMergeNeeded = false;
-        try (InternalLock _ = readLock.acquire()) {
+        try ( InternalLock lock = readLock.acquire()) {
             currentIndexWriter().maybeMerge();
         } catch (Throwable t) {
             maybeFailEngine(t, "maybe_merge");
@@ -1028,7 +1028,7 @@ public class InternalEngine extends AbstractIndexShardComponent implements Engin
     @Override
     public void optimize(Optimize optimize) throws EngineException {
         if (optimizeMutex.compareAndSet(false, true)) {
-            try (InternalLock _ = readLock.acquire()) {
+            try ( InternalLock lock = readLock.acquire()) {
                 final IndexWriter writer = currentIndexWriter();
 
                 /*
@@ -1084,7 +1084,7 @@ public class InternalEngine extends AbstractIndexShardComponent implements Engin
         // we have to flush outside of the readlock otherwise we might have a problem upgrading
         // the to a write lock when we fail the engine in this operation
         flush(new Flush().type(Flush.Type.COMMIT).waitIfOngoing(true));
-        try (InternalLock _ = readLock.acquire()) {
+        try ( InternalLock lock = readLock.acquire()) {
             ensureOpen();
             return deletionPolicy.snapshot();
         } catch (IOException e) {
@@ -1096,7 +1096,7 @@ public class InternalEngine extends AbstractIndexShardComponent implements Engin
     public void recover(RecoveryHandler recoveryHandler) throws EngineException {
         // take a write lock here so it won't happen while a flush is in progress
         // this means that next commits will not be allowed once the lock is released
-        try (InternalLock _ = writeLock.acquire()) {
+        try ( InternalLock lock = writeLock.acquire()) {
             if (closed) {
                 throw new EngineClosedException(shardId);
             }
@@ -1198,7 +1198,7 @@ public class InternalEngine extends AbstractIndexShardComponent implements Engin
 
     @Override
     public List<Segment> segments() {
-        try (InternalLock _ = readLock.acquire()) {
+        try ( InternalLock lock = readLock.acquire()) {
             ensureOpen();
             Map<String, Segment> segments = new HashMap<>();
 
@@ -1279,7 +1279,7 @@ public class InternalEngine extends AbstractIndexShardComponent implements Engin
 
     @Override
     public void close() throws ElasticsearchException {
-        try (InternalLock _ = writeLock.acquire()) {
+        try ( InternalLock lock = writeLock.acquire()) {
             if (!closed) {
                 try {
                     closed = true;
@@ -1492,7 +1492,7 @@ public class InternalEngine extends AbstractIndexShardComponent implements Engin
                     !codecName.equals(InternalEngine.this.codecName) ||
                     failOnMergeFailure != InternalEngine.this.failOnMergeFailure ||
                     codecBloomLoad != codecService.isLoadBloomFilter()) {
-                try (InternalLock _ = readLock.acquire()) {
+                try ( InternalLock lock = readLock.acquire()) {
                     if (indexConcurrency != InternalEngine.this.indexConcurrency) {
                         logger.info("updating index.index_concurrency from [{}] to [{}]", InternalEngine.this.indexConcurrency, indexConcurrency);
                         InternalEngine.this.indexConcurrency = indexConcurrency;
