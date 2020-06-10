@@ -1,3 +1,7 @@
+h1. This is a fork of official "Elasticsearch":https://github.com/elastic/elasticsearch Git repository. The only used branch here is "loggly/1.4.2":https://github.com/loggly/elasticsearch/tree/loggly/1.4.2 which contains Loggly changes to old 1.4.2 client required to run in current Loggly environment.
+
+-------------------------------
+
 h1. Elasticsearch
 
 h2. A Distributed RESTful Search Engine
