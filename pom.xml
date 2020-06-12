@@ -323,6 +323,14 @@
 
     <build>
 
+        <extensions>
+            <extension>
+                <groupId>com.allogy.maven.wagon</groupId>
+                <artifactId>maven-s3-wagon</artifactId>
+                <version>1.2.0</version>
+            </extension>
+        </extensions>
+
         <resources>
             <resource>
                 <directory>${basedir}/src/main/java</directory>
@@ -1367,6 +1375,18 @@
             </plugins>
         </pluginManagement>
     </build>
+
+    <distributionManagement>
+        <snapshotRepository>
+            <id>loggly-maven-repo-snapshot</id>
+            <url>s3://loggly-maven-repo/snapshot</url>
+        </snapshotRepository>
+        <repository>
+            <id>loggly-maven-repo-release</id>
+            <url>s3://loggly-maven-repo/release</url>
+        </repository>
+    </distributionManagement>
+
     <profiles>
         <!-- default profile, with randomization setting kicks in -->
         <profile>
