@@ -74,7 +74,8 @@ public class JvmInfo implements Streamable, Serializable, ToXContent {
             // ignore
         }
         info.inputArguments = runtimeMXBean.getInputArguments().toArray(new String[runtimeMXBean.getInputArguments().size()]);
-        info.bootClassPath = runtimeMXBean.getBootClassPath();
+        // JAVA 11 - Not supported
+        //info.bootClassPath = runtimeMXBean.getBootClassPath();
         info.classPath = runtimeMXBean.getClassPath();
         info.systemProperties = runtimeMXBean.getSystemProperties();
 
